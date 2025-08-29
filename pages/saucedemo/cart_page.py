@@ -31,7 +31,12 @@ class CartPage(BasePage):
         
     def is_loaded(self) -> bool:
         """Check if cart page is loaded."""
-        return "cart.html" in self.page.url
+        try:
+            # Wait for page to load and check URL
+            self.page.wait_for_load_state("networkidle", timeout=10000)
+            return "cart.html" in self.page.url
+        except:
+            return "cart.html" in self.page.url
         
     def get_page_title(self) -> str:
         """Get page title."""

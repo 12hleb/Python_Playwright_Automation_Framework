@@ -35,8 +35,12 @@ class InventoryPage(BasePage):
         
     def is_loaded(self) -> bool:
         """Check if inventory page is loaded."""
-        # Check for inventory items instead of title since title selector may vary
-        return len(self.page.locator(self.inventory_items).all()) > 0
+        try:
+            # Wait for inventory items to be visible and check URL
+            self.page.wait_for_selector(self.inventory_items, timeout=10000)
+            return "inventory.html" in self.page.url and len(self.page.locator(self.inventory_items).all()) > 0
+        except:
+            return False
         
     def get_page_title(self) -> str:
         """Get page title."""

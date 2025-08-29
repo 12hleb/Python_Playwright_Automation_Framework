@@ -40,6 +40,8 @@ class LoginPage(BasePage):
         self.fill_input(self.username_input, username)
         self.fill_input(self.password_input, password)
         self.click_element(self.login_button)
+        # Wait for navigation to complete
+        self.page.wait_for_load_state("networkidle", timeout=15000)
         
     def login_with_standard_user(self) -> None:
         """Login with standard user credentials."""

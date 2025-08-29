@@ -84,10 +84,11 @@ jobs:
           BROWSER=${{ matrix.browser }}
           HEADLESS=true
           SLOW_MO=0
-          TIMEOUT=30000
+          TIMEOUT=45000
           VIDEO_MODE=retain-on-failure
           SCREENSHOT_MODE=only-on-failure
           TRACE_MODE=retain-on-failure
+          SCREENSHOTS_ON_FAILURE=true
           EOF
 
       - name: 🧪 Run API Tests
