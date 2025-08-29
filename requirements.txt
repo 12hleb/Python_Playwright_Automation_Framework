@@ -9,7 +9,6 @@ requests>=2.31.0
 
 # Test Reports
 pytest-html>=4.0.0
-allure-pytest>=2.13.0
 
 # Configuration & Logging
 python-dotenv>=1.0.0
