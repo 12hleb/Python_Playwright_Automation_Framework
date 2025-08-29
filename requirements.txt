@@ -1,0 +1,23 @@
+# Core Testing Framework
+playwright>=1.40.0
+pytest>=7.4.0
+pytest-playwright>=0.4.0
+pytest-asyncio>=0.21.0
+
+# API Testing
+requests>=2.31.0
+
+# Test Reports
+pytest-html>=4.0.0
+allure-pytest>=2.13.0
+
+# Configuration & Logging
+python-dotenv>=1.0.0
+loguru>=0.7.0
+
+# Test Data
+faker>=20.1.0
+
+# Development Tools
+black>=23.0.0
+pytest-sugar>=0.9.7 
