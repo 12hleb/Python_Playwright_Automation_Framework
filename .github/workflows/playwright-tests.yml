@@ -1,0 +1,241 @@
+name: 🎭 Playwright Automation Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    # Run tests daily at 6 AM UTC
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+    inputs:
+      test_type:
+        description: 'Test type to run'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+        - all
+        - api
+        - ui
+        - security
+        - smoke
+      browser:
+        description: 'Browser to test'
+        required: true
+        default: 'chromium'
+        type: choice
+        options:
+        - chromium
+        - firefox
+        - webkit
+        - all
+
+env:
+  PYTHONPATH: ${{ github.workspace }}
+
+jobs:
+  test:
+    name: 🧪 Run Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, firefox, webkit]
+        test-type: [api, ui, security]
+        exclude:
+          # API tests don't need different browsers
+          - test-type: api
+            browser: firefox
+          - test-type: api
+            browser: webkit
+
+    steps:
+      - name: 📂 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 🐍 Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: 📦 Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: 🎭 Install Playwright browsers
+        run: |
+          playwright install --with-deps ${{ matrix.browser }}
+
+      - name: 🔧 Create environment file
+        run: |
+          cat > .env << EOF
+          BASE_URL=https://www.saucedemo.com/v1/
+          API_BASE_URL=https://jsonplaceholder.typicode.com
+          BROWSER=${{ matrix.browser }}
+          HEADLESS=true
+          SLOW_MO=0
+          TIMEOUT=30000
+          VIDEO_MODE=retain-on-failure
+          SCREENSHOT_MODE=only-on-failure
+          TRACE_MODE=retain-on-failure
+          EOF
+
+      - name: 🧪 Run API Tests
+        if: matrix.test-type == 'api'
+        run: |
+          python -m pytest tests/api/ -v \
+            --html=reports/api-report-${{ matrix.browser }}.html \
+            --self-contained-html \
+            --alluredir=reports/allure-results-api \
+            --tb=short
+
+      - name: 🌐 Run UI Tests
+        if: matrix.test-type == 'ui'
+        run: |
+          python -m pytest tests/ui/test_saucedemo_login.py tests/ui/test_saucedemo_shopping.py -v \
+            --browser=${{ matrix.browser }} \
+            --headed=false \
+            --html=reports/ui-report-${{ matrix.browser }}.html \
+            --self-contained-html \
+            --alluredir=reports/allure-results-ui \
+            --tb=short
+
+      - name: 🛡️ Run Security Tests
+        if: matrix.test-type == 'security'
+        run: |
+          python -m pytest tests/ui/test_saucedemo_security.py -v \
+            --browser=${{ matrix.browser }} \
+            --headed=false \
+            --html=reports/security-report-${{ matrix.browser }}.html \
+            --self-contained-html \
+            --alluredir=reports/allure-results-security \
+            --tb=short
+
+      - name: 📊 Upload Test Reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-reports-${{ matrix.test-type }}-${{ matrix.browser }}
+          path: |
+            reports/
+            test-results/
+          retention-days: 30
+
+      - name: 📸 Upload Screenshots
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: screenshots-${{ matrix.test-type }}-${{ matrix.browser }}
+          path: reports/screenshots/
+          retention-days: 7
+
+      - name: 🎬 Upload Videos
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: videos-${{ matrix.test-type }}-${{ matrix.browser }}
+          path: reports/videos/
+          retention-days: 7
+
+  smoke-tests:
+    name: 💨 Smoke Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    
+    steps:
+      - name: 📂 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 🐍 Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: 📦 Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: 🎭 Install Playwright browsers
+        run: playwright install --with-deps chromium
+
+      - name: 🔧 Create environment file
+        run: |
+          cat > .env << EOF
+          BASE_URL=https://www.saucedemo.com/v1/
+          API_BASE_URL=https://jsonplaceholder.typicode.com
+          BROWSER=chromium
+          HEADLESS=true
+          SLOW_MO=0
+          TIMEOUT=15000
+          EOF
+
+      - name: 💨 Run Smoke Tests
+        run: |
+          python -m pytest -m smoke -v \
+            --html=reports/smoke-report.html \
+            --self-contained-html \
+            --tb=short
+
+  allure-report:
+    name: 📈 Generate Allure Report
+    runs-on: ubuntu-latest
+    needs: [test]
+    if: always()
+    
+    steps:
+      - name: 📂 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 📥 Download all test results
+        uses: actions/download-artifact@v4
+        with:
+          pattern: test-reports-*
+          merge-multiple: true
+          path: allure-results
+
+      - name: 📈 Generate Allure Report
+        uses: simple-elf/allure-report-action@master
+        if: always()
+        with:
+          allure_results: allure-results
+          allure_report: allure-report
+          gh_pages: gh-pages
+          allure_history: allure-history
+
+      - name: 🚀 Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        if: always()
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: allure-history
+          publish_branch: gh-pages
+
+  notify:
+    name: 📬 Notify Results
+    runs-on: ubuntu-latest
+    needs: [test, smoke-tests]
+    if: always()
+    
+    steps:
+      - name: 📊 Test Summary
+        run: |
+          echo "## 🎭 Test Execution Summary" >> $GITHUB_STEP_SUMMARY
+          echo "| Test Type | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| API Tests | ${{ needs.test.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| UI Tests | ${{ needs.test.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Security Tests | ${{ needs.test.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Smoke Tests | ${{ needs.smoke-tests.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "📅 **Run Date:** $(date)" >> $GITHUB_STEP_SUMMARY
+          echo "🔗 **Repository:** ${{ github.repository }}" >> $GITHUB_STEP_SUMMARY
+          echo "🌿 **Branch:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "📝 **Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY 

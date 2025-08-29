@@ -1,0 +1,316 @@
+name: 🌙 Nightly Comprehensive Tests
+
+on:
+  schedule:
+    # Run nightly at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    inputs:
+      send_notification:
+        description: 'Send notification on completion'
+        required: false
+        default: true
+        type: boolean
+
+env:
+  PYTHONPATH: ${{ github.workspace }}
+
+jobs:
+  full-test-suite:
+    name: 🎯 Full Test Suite
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ['3.9', '3.10', '3.11']
+        browser: [chromium, firefox, webkit]
+        exclude:
+          # Reduce matrix size for cost optimization
+          - os: windows-latest
+            python-version: '3.9'
+          - os: macos-latest
+            python-version: '3.9'
+          - os: windows-latest
+            browser: webkit
+    
+    steps:
+      - name: 📂 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 🐍 Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: 'pip'
+
+      - name: 📦 Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: 🎭 Install Playwright browsers
+        run: |
+          playwright install --with-deps ${{ matrix.browser }}
+
+      - name: 🔧 Create environment file (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          cat > .env << EOF
+          BASE_URL=https://www.saucedemo.com/v1/
+          API_BASE_URL=https://jsonplaceholder.typicode.com
+          BROWSER=${{ matrix.browser }}
+          HEADLESS=true
+          SLOW_MO=0
+          TIMEOUT=30000
+          VIDEO_MODE=retain-on-failure
+          SCREENSHOT_MODE=only-on-failure
+          TRACE_MODE=retain-on-failure
+          EOF
+
+      - name: 🔧 Create environment file (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          echo "BASE_URL=https://www.saucedemo.com/v1/" > .env
+          echo "API_BASE_URL=https://jsonplaceholder.typicode.com" >> .env
+          echo "BROWSER=${{ matrix.browser }}" >> .env
+          echo "HEADLESS=true" >> .env
+          echo "SLOW_MO=0" >> .env
+          echo "TIMEOUT=30000" >> .env
+          echo "VIDEO_MODE=retain-on-failure" >> .env
+          echo "SCREENSHOT_MODE=only-on-failure" >> .env
+          echo "TRACE_MODE=retain-on-failure" >> .env
+
+      - name: 🧪 Run Complete Test Suite
+        run: |
+          python -m pytest -v \
+            --html=reports/full-report-${{ matrix.os }}-py${{ matrix.python-version }}-${{ matrix.browser }}.html \
+            --self-contained-html \
+            --alluredir=reports/allure-results \
+            --tb=long \
+            --durations=10
+
+      - name: 📊 Upload Full Test Reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: nightly-reports-${{ matrix.os }}-py${{ matrix.python-version }}-${{ matrix.browser }}
+          path: |
+            reports/
+            test-results/
+          retention-days: 7
+
+      - name: 📸 Upload Failure Artifacts
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: failure-artifacts-${{ matrix.os }}-py${{ matrix.python-version }}-${{ matrix.browser }}
+          path: |
+            reports/screenshots/
+            reports/videos/
+            reports/traces/
+          retention-days: 3
+
+  performance-tests:
+    name: 🚀 Performance Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    
+    steps:
+      - name: 📂 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 🐍 Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: 📦 Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: 🎭 Install Playwright browsers
+        run: playwright install --with-deps chromium
+
+      - name: 🔧 Create environment file
+        run: |
+          cat > .env << EOF
+          BASE_URL=https://www.saucedemo.com/v1/
+          API_BASE_URL=https://jsonplaceholder.typicode.com
+          BROWSER=chromium
+          HEADLESS=true
+          SLOW_MO=0
+          TIMEOUT=30000
+          EOF
+
+      - name: 🚀 Run Performance Tests
+        run: |
+          python -m pytest -m performance -v \
+            --html=reports/performance-report.html \
+            --self-contained-html \
+            --tb=short
+
+      - name: 📈 Upload Performance Reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: performance-reports
+          path: reports/performance-report.html
+          retention-days: 30
+
+  compatibility-check:
+    name: 🔄 Browser Compatibility
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    
+    strategy:
+      matrix:
+        browser: [chromium, firefox, webkit]
+    
+    steps:
+      - name: 📂 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 🐍 Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: 📦 Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: 🎭 Install Playwright browsers
+        run: playwright install --with-deps ${{ matrix.browser }}
+
+      - name: 🔧 Create environment file
+        run: |
+          cat > .env << EOF
+          BASE_URL=https://www.saucedemo.com/v1/
+          API_BASE_URL=https://jsonplaceholder.typicode.com
+          BROWSER=${{ matrix.browser }}
+          HEADLESS=true
+          SLOW_MO=0
+          TIMEOUT=30000
+          EOF
+
+      - name: 🔄 Run Compatibility Tests
+        run: |
+          python -m pytest tests/ui/ -v \
+            --browser=${{ matrix.browser }} \
+            --html=reports/compatibility-${{ matrix.browser }}.html \
+            --self-contained-html \
+            --tb=short
+
+      - name: 📊 Upload Compatibility Reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: compatibility-${{ matrix.browser }}
+          path: reports/compatibility-${{ matrix.browser }}.html
+          retention-days: 14
+
+  security-audit:
+    name: 🛡️ Security Audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    
+    steps:
+      - name: 📂 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 🐍 Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: 📦 Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install bandit safety
+
+      - name: 🔍 Run Bandit Security Scan
+        run: |
+          bandit -r . -f json -o reports/bandit-report.json || true
+
+      - name: 🔒 Run Safety Check
+        run: |
+          safety check --json --output reports/safety-report.json || true
+
+      - name: 🛡️ Run Security Tests
+        run: |
+          python -m pytest tests/ui/test_saucedemo_security.py -v \
+            --html=reports/security-tests.html \
+            --self-contained-html \
+            --tb=short
+
+      - name: 📋 Upload Security Reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: security-audit-reports
+          path: |
+            reports/bandit-report.json
+            reports/safety-report.json
+            reports/security-tests.html
+          retention-days: 30
+
+  generate-report:
+    name: 📈 Generate Comprehensive Report
+    runs-on: ubuntu-latest
+    needs: [full-test-suite, performance-tests, compatibility-check, security-audit]
+    if: always()
+    
+    steps:
+      - name: 📂 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 📥 Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: collected-reports
+
+      - name: 📊 Create Nightly Summary
+        run: |
+          echo "# 🌙 Nightly Test Execution Report" > nightly-summary.md
+          echo "" >> nightly-summary.md
+          echo "**Date:** $(date)" >> nightly-summary.md
+          echo "**Repository:** ${{ github.repository }}" >> nightly-summary.md
+          echo "**Branch:** ${{ github.ref_name }}" >> nightly-summary.md
+          echo "**Commit:** ${{ github.sha }}" >> nightly-summary.md
+          echo "" >> nightly-summary.md
+          echo "## 📊 Test Results Summary" >> nightly-summary.md
+          echo "" >> nightly-summary.md
+          echo "| Job | Status | Duration |" >> nightly-summary.md
+          echo "|-----|--------|----------|" >> nightly-summary.md
+          echo "| 🎯 Full Test Suite | ${{ needs.full-test-suite.result }} | - |" >> nightly-summary.md
+          echo "| 🚀 Performance Tests | ${{ needs.performance-tests.result }} | - |" >> nightly-summary.md
+          echo "| 🔄 Browser Compatibility | ${{ needs.compatibility-check.result }} | - |" >> nightly-summary.md
+          echo "| 🛡️ Security Audit | ${{ needs.security-audit.result }} | - |" >> nightly-summary.md
+          echo "" >> nightly-summary.md
+          echo "## 📁 Generated Artifacts" >> nightly-summary.md
+          echo "" >> nightly-summary.md
+          echo "- Test Reports (HTML)" >> nightly-summary.md
+          echo "- Performance Metrics" >> nightly-summary.md
+          echo "- Browser Compatibility Results" >> nightly-summary.md
+          echo "- Security Audit Reports" >> nightly-summary.md
+          echo "- Failure Screenshots/Videos (if any)" >> nightly-summary.md
+
+      - name: 📄 Upload Summary Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-summary-report
+          path: nightly-summary.md
+          retention-days: 30
+
+      - name: 📧 Post to Summary
+        run: |
+          cat nightly-summary.md >> $GITHUB_STEP_SUMMARY 
