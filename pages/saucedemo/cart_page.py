@@ -75,6 +75,8 @@ class CartPage(BasePage):
         remove_buttons = self.page.locator(self.remove_buttons).all()
         if item_index < len(remove_buttons):
             remove_buttons[item_index].click()
+            # Wait for the page to update after removal
+            self.page.wait_for_timeout(1000)
             
     def remove_all_items(self) -> None:
         """Remove all items from cart."""

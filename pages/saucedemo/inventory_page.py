@@ -58,6 +58,8 @@ class InventoryPage(BasePage):
     def click_cart(self) -> None:
         """Click on cart icon."""
         self.click_element(self.cart_icon)
+        # Wait for cart page to load
+        self.page.wait_for_load_state("networkidle", timeout=5000)
         
     def get_cart_items_count(self) -> int:
         """Get number of items in cart."""
@@ -90,6 +92,8 @@ class InventoryPage(BasePage):
         buttons = self.page.locator(self.add_to_cart_buttons_generic).all()
         if product_index < len(buttons):
             buttons[product_index].click()
+            # Wait for the cart to update
+            self.page.wait_for_timeout(500)
         else:
             raise ValueError(f"Product index {product_index} is out of range")
             
