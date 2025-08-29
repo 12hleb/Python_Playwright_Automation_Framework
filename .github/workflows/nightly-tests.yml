@@ -203,7 +203,6 @@ jobs:
       - name: 🔄 Run Compatibility Tests
         run: |
           python -m pytest tests/ui/ -v \
-            --browser=${{ matrix.browser }} \
             --html=reports/compatibility-${{ matrix.browser }}.html \
             --self-contained-html \
             --tb=short
