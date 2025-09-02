@@ -235,6 +235,9 @@ jobs:
           pip install -r requirements.txt
           pip install bandit safety
 
+      - name: 🎭 Install Playwright browsers
+        run: playwright install --with-deps chromium
+
       - name: 🔍 Run Bandit Security Scan
         run: |
           bandit -r . -f json -o reports/bandit-report.json || true
