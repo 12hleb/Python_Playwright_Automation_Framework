@@ -85,12 +85,7 @@ jobs:
 
       - name: 🧪 Run Complete Test Suite
         run: |
-          python -m pytest -v \
-            --browser=${{ matrix.browser }} \
-            --html=reports/full-report-${{ matrix.os }}-py${{ matrix.python-version }}-${{ matrix.browser }}.html \
-            --self-contained-html \
-            --tb=long \
-            --durations=10
+          python -m pytest -v --browser=${{ matrix.browser }} --html=reports/full-report-${{ matrix.os }}-py${{ matrix.python-version }}-${{ matrix.browser }}.html --self-contained-html --tb=long --durations=10
 
       - name: 📊 Upload Full Test Reports
         uses: actions/upload-artifact@v4
@@ -202,11 +197,7 @@ jobs:
 
       - name: 🔄 Run Compatibility Tests
         run: |
-          python -m pytest tests/ui/ -v \
-            --browser=${{ matrix.browser }} \
-            --html=reports/compatibility-${{ matrix.browser }}.html \
-            --self-contained-html \
-            --tb=short
+          python -m pytest tests/ui/ -v --browser=${{ matrix.browser }} --html=reports/compatibility-${{ matrix.browser }}.html --self-contained-html --tb=short
 
       - name: 📊 Upload Compatibility Reports
         uses: actions/upload-artifact@v4
@@ -250,11 +241,7 @@ jobs:
 
       - name: 🛡️ Run Security Tests
         run: |
-          python -m pytest tests/ui/test_saucedemo_security.py -v \
-            --browser=chromium \
-            --html=reports/security-tests.html \
-            --self-contained-html \
-            --tb=short
+          python -m pytest tests/ui/test_saucedemo_security.py -v --browser=chromium --html=reports/security-tests.html --self-contained-html --tb=short
 
       - name: 📋 Upload Security Reports
         uses: actions/upload-artifact@v4
